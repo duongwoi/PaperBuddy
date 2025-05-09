@@ -597,3 +597,47 @@ body:not(.logged-in) .nav__buttons > #user-info {
   .modal__subject-item input[type="checkbox"]:focus:not(:focus-visible) + label {
        outline: none;
   }
+  /* ===== TOAST MESSAGE STYLES ===== */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px); /* Bắt đầu ở dưới, sẽ trượt lên */
+    padding: 12px 25px;
+    border-radius: 6px;
+    color: white;
+    font-size: var(--normal-font-size);
+    font-weight: var(--font-medium);
+    z-index: 10001; /* Đảm bảo nó nổi lên trên các modal khác nếu cần */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s; /* Transition cho ẩn/hiện */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    text-align: center;
+    min-width: 250px; /* Hoặc một giá trị phù hợp */
+    max-width: 80%; /* Để không quá rộng trên màn hình lớn */
+}
+
+.toast.toast--visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0); /* Trượt lên vị trí cuối cùng */
+    transition-delay: 0s; /* Reset delay khi hiện */
+}
+
+/* Màu sắc cho các loại toast khác nhau */
+.toast--info {
+    background-color: var(--primary-color, #3B82F6); /* Dùng biến primary nếu có, fallback màu xanh */
+}
+
+.toast--success {
+    background-color: #10B981; /* Màu xanh lá cây */
+}
+
+.toast--warning {
+    background-color: #F59E0B; /* Màu vàng cam */
+}
+
+.toast--error {
+    background-color: var(--delete-color, #EF4444); /* Dùng biến delete nếu có, fallback màu đỏ */
+}

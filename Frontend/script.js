@@ -24,12 +24,11 @@ function logoutUser() {
     const username = getCurrentUsername();
     if (username) {
         localStorage.removeItem(AUTH_KEY);
-        // Consider clearing other user-specific localStorage if any remains
         console.log(`User "${username}" logged out.`);
     }
 }
 
-// --- LocalStorage Helpers --- (Không thay đổi nhiều, nhưng getUserData/setUserData sẽ ít dùng hơn)
+// --- LocalStorage Helpers ---
 function getStorageItem(key, defaultValue = {}) {
     if (!key) return defaultValue;
     try {
@@ -54,28 +53,39 @@ function setStorageItem(key, value) {
         return false;
     }
 }
-// Constants for any remaining Base Storage Keys (e.g., for user subjects if kept client-side)
-const BASE_STORAGE_KEYS = {
-    USER_SUBJECTS: 'paperBuddyUserSubjects',
-    // PAPER_STATUSES: 'paperBuddyPaperStatuses', // Sẽ được lấy từ DB
-    // ATTEMPT_DURATIONS: 'paperBuddyAttemptDurations' // Sẽ được lấy từ DB
-};
-function getUserData(baseKey, defaultValue = {}) {
-    const username = getCurrentUsername();
-    if (!username) return defaultValue; // If no user, return default
-    const userKey = `${baseKey}_user_${username}`;
-    return getStorageItem(userKey, defaultValue);
-}
-function setUserData(baseKey, value) {
+
+// Function to get the correct storage key for the current user (cho các dữ liệu client-side)
+function getUserStorageKey(baseKey) {
     const username = getCurrentUsername();
     if (!username) {
+        return null; // Hoặc baseKey nếu bạn muốn dữ liệu không theo user khi chưa login
+    }
+    return `${baseKey}_user_${username}`;
+}
+
+// Modified Storage Functions to use user-specific keys (cho các dữ liệu client-side)
+function getUserData(baseKey, defaultValue = {}) {
+    const userKey = getUserStorageKey(baseKey);
+    if (!userKey) return defaultValue; // Nếu không có user, trả về default
+    return getStorageItem(userKey, defaultValue);
+}
+
+function setUserData(baseKey, value) {
+    const userKey = getUserStorageKey(baseKey);
+    if (!userKey) {
         console.error(`Error saving user data (${baseKey}): User not logged in.`);
         return false;
     }
-    const userKey = `${baseKey}_user_${username}`;
     return setStorageItem(userKey, value);
 }
 
+
+// Constants for Base Storage Keys (USER_SUBJECTS vẫn dùng localStorage)
+const BASE_STORAGE_KEYS = {
+    USER_SUBJECTS: 'paperBuddyUserSubjects',
+    // PAPER_STATUSES và ATTEMPT_DURATIONS sẽ được quản lý bởi backend và lấy qua API.
+    // Chúng ta có thể thêm placeholder cho PAPER_STATUSES để test UI.
+};
 
 // ===== UTILITY FUNCTIONS =====
 const formatTime = (totalSeconds) => {
@@ -109,26 +119,20 @@ function formatPaperCode(paperId) {
 }
 
 function displayUserMessage(message, type = 'info', duration = 5000) {
-    // Basic console log for now. Consider implementing a proper UI element.
-    switch (type) {
-        case 'error': console.error("User Message:", message); break;
-        case 'warning': console.warn("User Message:", message); break;
-        case 'success': console.log("User Message (Success):", message); break;
-        default: console.log("User Message (Info):", message);
-    }
-    // Example for a simple UI toast (you'd need to create #user-message-toast in HTML)
     const toast = document.getElementById('user-message-toast');
     if (toast) {
         toast.textContent = message;
-        toast.className = `toast toast--${type}`; // Add classes for styling
-        toast.style.display = 'block';
+        toast.className = `toast toast--visible toast--${type}`; // Thêm class visible
         setTimeout(() => {
-            toast.style.display = 'none';
+            toast.classList.remove('toast--visible');
         }, duration);
+    } else { // Fallback to console if toast element not found
+        const logMethod = type === 'error' ? console.error : type === 'warning' ? console.warn : console.log;
+        logMethod(`User Message (${type.toUpperCase()}): ${message}`);
     }
 }
 
-// ===== GLOBAL DATA SOURCE (Mock - For subject info, paper listing) =====
+// ===== GLOBAL DATA SOURCE (Cho danh sách papers) =====
 const ALL_PAPER_DATA_SOURCE = [
     { id: 'econ-9708-11-mj-25', subjectId: 'economics-9708', subjectCode: '9708', subjectName: 'Economics', paperNumber: '1', variant: '1', sessionCode: 'MJ', year: 2025, sessionLabel: 'May/June'},
     { id: 'biz-9609-21-fm-25', subjectId: 'business-9609', subjectCode: '9609', subjectName: 'Business', paperNumber: '2', variant: '1', sessionCode: 'FM', year: 2025, sessionLabel: 'Feb/March'},
@@ -143,52 +147,48 @@ const ALL_PAPER_DATA_SOURCE = [
 ];
 
 // ===== FIREBASE CLIENT SDK CONFIG & INITIALIZATION =====
-// TODO: Thay thế bằng Firebase config của bạn từ Firebase Console
-// (Project settings -> General -> Your apps -> Web app -> Config)
 const firebaseConfig = {
-    apiKey: "AIzaSyYOUR_FIREBASE_API_KEY_HERE", // An toàn để lộ ở client
-    authDomain: "paperbuddy-643ba.firebaseapp.com", // Thay bằng authDomain của bạn
-    projectId: "paperbuddy-643ba",                 // Thay bằng projectId của bạn
-    storageBucket: "paperbuddy-643ba.appspot.com", // Khớp với FIREBASE_STORAGE_BUCKET ở backend
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID_HERE",
-    appId: "YOUR_APP_ID_HERE"
+    apiKey: "YOUR_API_KEY_HERE", // ĐIỀN THÔNG TIN CỦA BẠN
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
 let firebaseApp;
-let storageClient; // Firebase Storage client instance
+let storageClient;
 
 function initializeFirebaseClient() {
-    // Kiểm tra xem `firebase` object có tồn tại không (từ script SDK)
     if (typeof firebase === 'undefined') {
-        console.error("Firebase SDK not loaded. Make sure to include the Firebase JS SDK scripts in your HTML.");
+        console.error("Firebase SDK not loaded.");
         displayUserMessage("File service unavailable. Please refresh.", "error");
-        return false; // Initialization failed
+        return false;
     }
-
-    if (!firebaseApp) { // Chỉ khởi tạo một lần
+    if (!firebaseApp) {
         try {
             firebaseApp = firebase.initializeApp(firebaseConfig);
-            storageClient = firebase.storage(); // Khởi tạo Storage
+            storageClient = firebase.storage();
             console.log("Firebase client initialized.");
-            return true; // Initialization successful
+            return true;
         } catch (e) {
             console.error("Error initializing Firebase client:", e);
             displayUserMessage("Error connecting to file service. Upload might not work.", "error");
-            return false; // Initialization failed
+            return false;
         }
     }
-    return true; // Already initialized
+    return true;
 }
 
 // --- Firebase File Upload Helper ---
 async function uploadFileToFirebase(file, userId, paperId) {
+    // ... (Giữ nguyên logic hàm này như đã cung cấp ở phản hồi trước)
     if (!initializeFirebaseClient() || !storageClient || !file || !userId || !paperId) {
         console.error("Firebase Storage not initialized or missing parameters for upload.");
         displayUserMessage("File upload service not ready. Please try again.", "error");
         return null;
     }
     const timestamp = Date.now();
-    // Sanitize paperId for path, thay thế ký tự không hợp lệ bằng gạch dưới
     const sanitizedPaperId = paperId.replace(/[^a-zA-Z0-9-]/g, '_');
     const filePath = `user_uploads/${userId}/${sanitizedPaperId}/${timestamp}_${file.name}`;
     const fileRef = storageClient.ref(filePath);
@@ -205,21 +205,12 @@ async function uploadFileToFirebase(file, userId, paperId) {
         let errorMsg = `Error uploading ${file.name}.`;
         if (error.code) {
             switch (error.code) {
-                case 'storage/unauthorized':
-                    errorMsg += ' You do not have permission to upload.';
-                    break;
-                case 'storage/canceled':
-                    errorMsg += ' Upload was canceled.';
-                    break;
-                case 'storage/unknown':
-                    errorMsg += ' An unknown error occurred.';
-                    break;
-                default:
-                    errorMsg += ` ${error.message}`;
+                case 'storage/unauthorized': errorMsg += ' You do not have permission to upload.'; break;
+                case 'storage/canceled': errorMsg += ' Upload was canceled.'; break;
+                case 'storage/unknown': errorMsg += ' An unknown error occurred.'; break;
+                default: errorMsg += ` ${error.message}`;
             }
-        } else {
-            errorMsg += ` ${error.message}`;
-        }
+        } else { errorMsg += ` ${error.message}`; }
         displayUserMessage(errorMsg, 'error');
         return null;
     }
@@ -228,26 +219,21 @@ async function uploadFileToFirebase(file, userId, paperId) {
 
 // ===== DOMContentLoaded =====
 document.addEventListener('DOMContentLoaded', () => {
+    // ... (Giữ nguyên logic DOMContentLoaded như đã cung cấp ở phản hồi trước)
     console.log("PaperBuddy Script Loaded");
-
-    // Initialize Firebase Client as early as possible
     initializeFirebaseClient();
-
     setupHeaderScroll();
     updateHeaderUI();
     setupLoginModal();
     setupLoginRequiredChecks();
-
     const pathname = window.location.pathname.split('/').pop() || 'index.html';
     if (pathname !== 'index.html' && !isUserLoggedIn()) {
-        console.log(`Page ${pathname}: User not logged in. Redirecting to landing page.`);
         if (['attempt.html', 'test.html', 'result.html'].includes(pathname)) {
             alert(`Please log in to access ${pathname.split('.')[0]}.`);
         }
         window.location.href = 'index.html';
         return;
     }
-
     switch (pathname) {
         case 'index.html': break;
         case 'dashboard.html': setupDashboardPage(); break;
@@ -260,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===== GENERAL FUNCTIONS (Header Scroll, Modals) =====
+// ... (Giữ nguyên các hàm setupHeaderScroll, trapFocus, openModal, closeModal như đã cung cấp)
 function setupHeaderScroll() {
     const header = document.querySelector('.header');
     if (!header) return;
@@ -272,37 +259,20 @@ function setupHeaderScroll() {
 }
 
 function trapFocus(event, modalElement) {
-    // ... (logic không đổi)
     if (!modalElement || !modalElement.classList.contains('is-visible') || event.key !== 'Tab') return;
     const focusableElements = modalElement.querySelectorAll(
         'button:not([disabled]), [href], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
     );
-    if (focusableElements.length === 0) {
-        event.preventDefault();
-        return;
-    }
+    if (focusableElements.length === 0) { event.preventDefault(); return; }
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
-
-    if (event.shiftKey) {
-        if (document.activeElement === firstElement) {
-            lastElement.focus();
-            event.preventDefault();
-        }
-    } else {
-        if (document.activeElement === lastElement) {
-            firstElement.focus();
-            event.preventDefault();
-        }
-    }
-}
+    if (event.shiftKey) { if (document.activeElement === firstElement) { lastElement.focus(); event.preventDefault();}}
+    else { if (document.activeElement === lastElement) { firstElement.focus(); event.preventDefault();}}}
 
 function openModal(modalElement, focusElement) {
-    // ... (logic không đổi)
     if (!modalElement) return null;
     const previouslyFocused = document.activeElement;
-    modalElement.hidden = false;
-    void modalElement.offsetWidth;
+    modalElement.hidden = false; void modalElement.offsetWidth;
     modalElement.classList.add('is-visible');
     modalElement.setAttribute('aria-hidden', 'false');
     const elementToFocus = focusElement && modalElement.contains(focusElement) && !focusElement.disabled
@@ -315,38 +285,26 @@ function openModal(modalElement, focusElement) {
     document.addEventListener('keydown', modalElement._trapFocusListener);
     return previouslyFocused;
 }
-
 function closeModal(modalElement, previouslyFocusedElement) {
-    // ... (logic không đổi)
      if (!modalElement || !modalElement.classList.contains('is-visible')) return;
      modalElement.classList.remove('is-visible');
      modalElement.setAttribute('aria-hidden', 'true');
-     if (modalElement._trapFocusListener) {
-         document.removeEventListener('keydown', modalElement._trapFocusListener);
-         delete modalElement._trapFocusListener;
-     }
+     if (modalElement._trapFocusListener) { document.removeEventListener('keydown', modalElement._trapFocusListener); delete modalElement._trapFocusListener;}
      const handleTransitionEnd = (event) => {
          if (event.target === modalElement) {
              modalElement.hidden = true;
              if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function' && document.body.contains(previouslyFocusedElement)) {
                   const style = window.getComputedStyle(previouslyFocusedElement);
                  if (style.display !== 'none' && style.visibility !== 'hidden' && !previouslyFocusedElement.disabled && previouslyFocusedElement.tabIndex !== -1) {
-                      previouslyFocusedElement.focus({ preventScroll: true });
-                 }
-             }
-             modalElement.removeEventListener('transitionend', handleTransitionEnd);
-         }
-     };
+                      previouslyFocusedElement.focus({ preventScroll: true });}}
+             modalElement.removeEventListener('transitionend', handleTransitionEnd);}};
      modalElement.addEventListener('transitionend', handleTransitionEnd);
-     setTimeout(() => {
-         if (!modalElement.hidden && modalElement.getAttribute('aria-hidden') === 'true') {
-              handleTransitionEnd({ target: modalElement });
-         }
-     }, 500);
+     setTimeout(() => { if (!modalElement.hidden && modalElement.getAttribute('aria-hidden') === 'true') { handleTransitionEnd({ target: modalElement });}}, 500);
 }
 
 // ===== LOGIN / AUTH FUNCTIONS =====
-function updateHeaderUI() { /* ... (logic không đổi) ... */
+// ... (Giữ nguyên các hàm updateHeaderUI, setupLoginModal, triggerLoginModal, setupLoginRequiredChecks như đã cung cấp)
+function updateHeaderUI() {
     const loggedIn = isUserLoggedIn();
     const username = getCurrentUsername();
     const loginBtn = document.getElementById('login-trigger-btn');
@@ -354,115 +312,70 @@ function updateHeaderUI() { /* ... (logic không đổi) ... */
     const userInfoDiv = document.getElementById('user-info');
     const usernameDisplay = document.getElementById('nav-username-display');
     const logoutBtn = document.getElementById('logout-btn');
-
     if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
     if (joinBtn) joinBtn.style.display = loggedIn ? 'none' : '';
     if (userInfoDiv) userInfoDiv.style.display = loggedIn ? 'flex' : 'none';
-
-    if (loggedIn && usernameDisplay) {
-        usernameDisplay.textContent = username;
-    }
-
+    if (loggedIn && usernameDisplay) { usernameDisplay.textContent = username; }
     if (logoutBtn) {
         const newLogoutBtn = logoutBtn.cloneNode(true);
         logoutBtn.parentNode.replaceChild(newLogoutBtn, logoutBtn);
         if (loggedIn) {
             newLogoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                logoutUser();
-                updateHeaderUI();
-                window.location.href = 'index.html';
-            });
-        }
-    }
-}
-
-function setupLoginModal() { /* ... (logic không đổi) ... */
+                e.preventDefault(); logoutUser(); updateHeaderUI(); window.location.href = 'index.html';
+            });}}}
+function setupLoginModal() {
     const loginModal = document.getElementById('login-modal');
-    if (!loginModal) { console.error("Login modal element (#login-modal) not found!"); return; }
-    const openModalTriggers = document.querySelectorAll('[data-open-modal="login-modal"]');
-    openModalTriggers.forEach(trigger => {
-        trigger.addEventListener('click', (event) => {
-            triggerLoginModal(event, trigger);
-        });
-    });
+    if (!loginModal) { console.error("Login modal not found!"); return; }
+    document.querySelectorAll('[data-open-modal="login-modal"]').forEach(trigger => {
+        trigger.addEventListener('click', (event) => triggerLoginModal(event, trigger));});
     const closeModalElements = loginModal.querySelectorAll('[data-close-modal], .modal__close-btn');
     const loginForm = document.getElementById('login-form');
     const usernameInput = document.getElementById('login-username');
     const errorMessage = document.getElementById('login-error-message');
-    if (!loginForm || !usernameInput || !errorMessage) { console.error("Required elements within the login modal are missing."); return; }
+    if (!loginForm || !usernameInput || !errorMessage) { console.error("Login modal inner elements missing."); return; }
     const closeLoginModal = () => {
         const focusRestoreTarget = loginModal._focusRestoreElement;
         closeModal(loginModal, focusRestoreTarget);
-        if (loginModal._focusRestoreElement) { delete loginModal._focusRestoreElement; }
-    };
+        if (loginModal._focusRestoreElement) { delete loginModal._focusRestoreElement; }};
     closeModalElements.forEach(el => el.addEventListener('click', closeLoginModal));
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && loginModal.classList.contains('is-visible')) {
-            closeLoginModal();
-        }
-    });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && loginModal.classList.contains('is-visible')) closeLoginModal();});
     loginForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        errorMessage.hidden = true;
+        event.preventDefault(); errorMessage.hidden = true;
         const username = usernameInput.value.trim();
-        if (!username) {
-            errorMessage.textContent = "Username is required.";
-            errorMessage.hidden = false;
-            usernameInput.focus();
-            return;
-        }
-        const success = loginUser(username);
-        if (success) {
-            closeLoginModal();
-            updateHeaderUI();
-            setTimeout(() => window.location.reload(), 50);
-        } else {
-            errorMessage.textContent = "Login failed (mock). Please enter a valid username.";
-            errorMessage.hidden = false;
-        }
-    });
-}
-
-function triggerLoginModal(event, triggerElement) { /* ... (logic không đổi) ... */
+        if (!username) { errorMessage.textContent = "Username is required."; errorMessage.hidden = false; usernameInput.focus(); return; }
+        if (loginUser(username)) { closeLoginModal(); updateHeaderUI(); setTimeout(() => window.location.reload(), 50); }
+        else { errorMessage.textContent = "Login failed. Please enter a username."; errorMessage.hidden = false; }});}
+function triggerLoginModal(event, triggerElement) {
     if (event) event.preventDefault();
     const loginModal = document.getElementById('login-modal');
     const usernameInput = document.getElementById('login-username');
     const loginForm = document.getElementById('login-form');
     const errorMessage = document.getElementById('login-error-message');
-    if (!loginModal || !usernameInput || !loginForm || !errorMessage) {
-         displayUserMessage("Login component error. Please refresh.", "error");
-         return;
-    }
-    loginForm.reset();
-    errorMessage.hidden = true;
+    if (!loginModal || !usernameInput || !loginForm || !errorMessage) { displayUserMessage("Login component error.", "error"); return; }
+    loginForm.reset(); errorMessage.hidden = true;
     const focusRestoreTarget = triggerElement || event?.currentTarget || document.body;
     const elementThatWasFocused = openModal(loginModal, usernameInput);
-    loginModal._focusRestoreElement = focusRestoreTarget || elementThatWasFocused;
-}
-
-function setupLoginRequiredChecks() { /* ... (logic không đổi) ... */
+    loginModal._focusRestoreElement = focusRestoreTarget || elementThatWasFocused;}
+function setupLoginRequiredChecks() {
     const loginModal = document.getElementById('login-modal');
     if (!loginModal) return;
     const requiresLoginSelectors = [
         '.nav__list a[href="dashboard.html"]', '.nav__list a[href="papers.html"]',
-        '.hero__search-button', '.hero__search-form', '.subjects__item', '.cta__container a.button'
-    ];
+        '.hero__search-button', '.hero__search-form', '.subjects__item', '.cta__container a.button'];
     document.querySelectorAll(requiresLoginSelectors.join(', ')).forEach(element => {
         const handler = (event) => {
             if (!isUserLoggedIn()) {
                 const trigger = (element.tagName === 'FORM') ? element.querySelector('button[type="submit"], input[type="submit"]') : event.currentTarget;
-                triggerLoginModal(event, trigger || element);
-            }
-        };
+                triggerLoginModal(event, trigger || element);}};
         if (element.tagName === 'FORM') element.addEventListener('submit', handler);
-        else if (element.tagName === 'A' || element.tagName === 'BUTTON') element.addEventListener('click', handler);
-    });
-}
+        else if (element.tagName === 'A' || element.tagName === 'BUTTON') element.addEventListener('click', handler);});}
 
-// ===== DASHBOARD PAGE LOGIC =====
+
+// ===== DASHBOARD PAGE LOGIC (Giữ nguyên việc lưu subject vào localStorage) =====
 function setupDashboardPage() {
-    // TODO: Cập nhật để lấy subject stats từ backend nếu cần
+    // ... (Copy toàn bộ nội dung hàm setupDashboardPage từ phản hồi trước,
+    //      đảm bảo nó sử dụng getUserData/setUserData cho USER_SUBJECTS
+    //      và calculateSubjectStats có thể mock dữ liệu.)
     console.log("Setting up Dashboard Page...");
     const username = getCurrentUsername();
     const modal = document.getElementById('subject-modal');
@@ -476,20 +389,14 @@ function setupDashboardPage() {
     if (!modal || !openModalBtn || !closeModalElements || !subjectForm || !subjectsListWrapper || !noSubjectsMessage || !welcomeTitle) {
         console.warn("Dashboard page missing essential elements."); return;
     }
-    welcomeTitle.textContent = `Hi, ${username}`;
+    if (welcomeTitle && username) welcomeTitle.textContent = `Hi, ${username}`;
     let previouslyFocusedElementDash = null;
-    let currentUserSubjects = getUserData(BASE_STORAGE_KEYS.USER_SUBJECTS, []); // Vẫn dùng localStorage cho subject preferences
+    let currentUserSubjects = getUserData(BASE_STORAGE_KEYS.USER_SUBJECTS, []);
 
-    // Hàm calculateSubjectStats có thể cần lấy paperStatuses từ backend thay vì localStorage
-    // Hoặc, để đơn giản tạm thời, backend có thể trả về stats này
-    function calculateSubjectStats(subjectId) {
-        // Tạm thời giữ nguyên logic này, nhưng lý tưởng là lấy từ backend
-        // const paperStatuses = getStorageItem(getUserStorageKey(BASE_STORAGE_KEYS.PAPER_STATUSES), {});
-        // ... logic tính toán ...
-        // return { progress, grade };
-        return { progress: Math.floor(Math.random() * 100), grade: ['A', 'B', 'C', 'N/A'][Math.floor(Math.random() * 4)] }; // Mock
+    function calculateSubjectStats(subjectId) { // Mock data for UI testing
+        return { progress: Math.floor(Math.random() * 100), grade: ['A', 'B', 'C', 'N/A'][Math.floor(Math.random() * 4)] };
     }
-    const createSubjectRow = (subjectData) => { /* ... (logic không đổi) ... */
+    const createSubjectRow = (subjectData) => {
         if (!subjectData?.id) return null;
         const stats = calculateSubjectStats(subjectData.id);
         const subjectLabel = subjectData.label || subjectData.id;
@@ -502,43 +409,49 @@ function setupDashboardPage() {
         const actionCell = document.createElement('div'); actionCell.className = 'subjects-list__cell subjects-list__cell--action';
         const link = document.createElement('a'); link.href = `papers.html?subject=${subjectData.id}`; link.className = 'subjects-list__link'; link.setAttribute('aria-label', `View ${subjectLabel} papers`); link.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`; actionCell.appendChild(link); article.append(subjectCell, papersCell, gradeCell, actionCell); return article;
     };
-    const renderSubjectsList = (subjectsData) => { /* ... (logic không đổi) ... */
+    const renderSubjectsList = (subjectsData) => {
+        if (!subjectsListWrapper || !noSubjectsMessage || !subjectForm) return;
         const items = subjectsListWrapper.querySelectorAll('.subjects-list__item');
         items.forEach(item => item.remove());
         const validSubjectsData = Array.isArray(subjectsData) ? subjectsData : [];
         noSubjectsMessage.hidden = validSubjectsData.length > 0;
         if (validSubjectsData.length > 0) {
-            validSubjectsData.forEach(subject => { const row = createSubjectRow(subject); if(row) subjectsListWrapper.appendChild(row); });
-            noSubjectsMessage.hidden = true;
-        } else { noSubjectsMessage.hidden = false; }
-        subjectForm.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = validSubjectsData.some(s => s.id === cb.value); });
+            validSubjectsData.forEach(subject => { const row = createSubjectRow(subject); if (row) subjectsListWrapper.appendChild(row); });
+        }
+        subjectForm.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = validSubjectsData.some(s => s.id === cb.value);
+        });
     };
-    const openSubjectModal = () => { /* ... (logic không đổi) ... */
-         const validSubjectsData = Array.isArray(currentUserSubjects) ? currentUserSubjects : [];
-         subjectForm.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = validSubjectsData.some(s => s.id === cb.value); });
-         const focusTarget = subjectForm.querySelector('input[type="checkbox"]') || subjectForm.querySelector('button[type="submit"]');
-         previouslyFocusedElementDash = openModal(modal, focusTarget);
+    const openSubjectModal = () => {
+        const validSubjectsData = Array.isArray(currentUserSubjects) ? currentUserSubjects : [];
+        subjectForm.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = validSubjectsData.some(s => s.id === cb.value);
+        });
+        const focusTarget = subjectForm.querySelector('input[type="checkbox"]') || subjectForm.querySelector('button[type="submit"]');
+        previouslyFocusedElementDash = openModal(modal, focusTarget);
     };
     const closeSubjectModal = () => { closeModal(modal, previouslyFocusedElementDash); };
-    openModalBtn.addEventListener('click', openSubjectModal);
+    if(openModalBtn) openModalBtn.addEventListener('click', openSubjectModal);
     closeModalElements.forEach(el => el.addEventListener('click', closeSubjectModal));
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal?.classList.contains('is-visible')) closeSubjectModal(); });
-    subjectForm.addEventListener('submit', (event) => { /* ... (logic không đổi) ... */
+    if(subjectForm) subjectForm.addEventListener('submit', (event) => {
         event.preventDefault();
         const checked = subjectForm.querySelectorAll('input[name="subjects"]:checked');
         const newData = Array.from(checked).map(cb => ({ id: cb.value, label: cb.dataset.label || cb.value }));
         currentUserSubjects = newData;
-        if (setUserData(BASE_STORAGE_KEYS.USER_SUBJECTS, currentUserSubjects)) { // Vẫn lưu subject preferences vào localStorage
+        if (setUserData(BASE_STORAGE_KEYS.USER_SUBJECTS, currentUserSubjects)) {
             renderSubjectsList(currentUserSubjects);
+            displayUserMessage("Subjects saved successfully!", "success");
         }
         closeSubjectModal();
     });
     renderSubjectsList(currentUserSubjects);
 }
 
-// ===== PAPERS PAGE LOGIC =====
+// ===== PAPERS PAGE LOGIC (Có placeholder cho paperStatuses) =====
 function setupPapersPage_Dynamic() {
-    // TODO: Cập nhật paperStatuses từ backend thay vì localStorage
+    // ... (Copy toàn bộ nội dung hàm setupPapersPage_Dynamic từ phản hồi trước,
+    //      đảm bảo nó có mock data cho paperStatuses để test UI.)
     console.log("Setting up Papers Page (Dynamic Rendering)...");
     const papersListContainer = document.getElementById('papers-list-container');
     const noPapersMessage = document.getElementById('no-papers-message');
@@ -551,23 +464,33 @@ function setupPapersPage_Dynamic() {
     }
     const urlParams = new URLSearchParams(window.location.search);
     const subjectFilterFromUrl = urlParams.get('subject');
-    // const paperStatuses = getStorageItem(getUserStorageKey(BASE_STORAGE_KEYS.PAPER_STATUSES), {}); // Sẽ thay thế bằng fetch từ backend
-    let paperStatuses = {}; // Placeholder, sẽ được fetch
+    let paperStatuses = {}; // Sẽ được điền bởi mock data hoặc fetch từ backend
 
-    async function fetchPaperStatuses() {
+    async function fetchPaperStatusesAndApplyMock() { // Đổi tên hàm để rõ ràng hơn
         const userId = getCurrentUsername();
-        if (!userId) return {};
-        // TODO: Implement backend action `get_all_user_paper_statuses`
-        // try {
-        //     const response = await fetch(`/.netlify/functions/backend?action=get_all_user_paper_statuses&userId=${userId}`);
-        //     const data = await response.json();
-        //     if (response.ok && data.statuses) return data.statuses;
-        //     return {};
-        // } catch (e) { return {}; }
-        return {}; // Mock
+        // Hiện tại chỉ mock, sau này sẽ fetch từ backend
+        // if (userId) {
+        //     try {
+        //         const response = await fetch(`/.netlify/functions/backend?action=get_all_user_paper_statuses&userId=${userId}`);
+        //         if (response.ok) {
+        //             const data = await response.json();
+        //             if (data.success && data.statuses) return data.statuses;
+        //         }
+        //     } catch (e) { console.error("Error fetching paper statuses:", e); }
+        // }
+
+        // Mock data for testing if no user or fetch fails
+        let mockStatuses = {};
+        if (isUserLoggedIn()) { // Chỉ thêm mock nếu đã login để có thể link tới attemptId
+            console.log("Applying MOCK paper statuses for testing papers page.");
+            mockStatuses['econ-9708-11-mj-25'] = { status: 'done', linkAttemptId: `${getCurrentUsername()}_econ-9708-11-mj-25_mock1` };
+            mockStatuses['biz-9609-21-fm-25'] = { status: 'not_done', linkAttemptId: null };
+            mockStatuses['econ-9708-32-on-25'] = { status: 'done', linkAttemptId: `${getCurrentUsername()}_econ-9708-32-on-25_mock2` };
+        }
+        return mockStatuses;
     }
 
-    function createPaperCard(paper) { /* ... (logic không đổi, dùng paperStatuses đã fetch) ... */
+    function createPaperCard(paper) {
         if (!paper?.id) return null;
         const link = document.createElement('a');
         const statusInfo = paperStatuses[paper.id] || { status: 'not_done', linkAttemptId: null };
@@ -582,38 +505,34 @@ function setupPapersPage_Dynamic() {
         link.innerHTML = `<span class="paper-card__name">${displayCode}</span> <span class="paper-card__status">${statusInfo.status === 'done' ? 'Done' : 'Not Done'}</span>`;
         return link;
     }
-    function renderPapers(papersToRender) { /* ... (logic không đổi) ... */
+    function renderPapers(papersToRender) {
+        if(!papersListContainer || !noPapersMessage) return;
         papersListContainer.innerHTML = '';
-        papersListContainer.appendChild(noPapersMessage);
+        papersListContainer.appendChild(noPapersMessage); // Đưa vào để có thể ẩn/hiện
         noPapersMessage.hidden = true;
         if (!Array.isArray(papersToRender) || papersToRender.length === 0) {
-            noPapersMessage.textContent = "No past papers found matching your filters.";
-            noPapersMessage.hidden = false;
-            return;
+            noPapersMessage.textContent = "No past papers found matching your filters."; noPapersMessage.hidden = false; return;
         }
-        const papersByYear = papersToRender.reduce((acc, paper) => {
-            const year = paper.year || 'Unknown Year'; if (!acc[year]) acc[year] = []; acc[year].push(paper); return acc;
-        }, {});
-        const sortedYears = Object.keys(papersByYear).sort((a, b) => {
-            const yearA = parseInt(a); const yearB = parseInt(b);
-            if (isNaN(yearA) && isNaN(yearB)) return 0; if (isNaN(yearA)) return 1; if (isNaN(yearB)) return -1; return yearB - yearA;
-        });
+        const papersByYear = papersToRender.reduce((acc, p) => { const year = p.year || 'Unknown'; if (!acc[year]) acc[year] = []; acc[year].push(p); return acc; }, {});
+        const sortedYears = Object.keys(papersByYear).sort((a, b) => parseInt(b) - parseInt(a)); // Sắp xếp năm giảm dần
         let papersFound = false;
         sortedYears.forEach(year => {
-            const yearGroupSection = document.createElement('section'); yearGroupSection.className = 'papers-year-group'; yearGroupSection.dataset.year = year;
+            const yearGroupSection = document.createElement('section'); yearGroupSection.className = 'papers-year-group';
             const yearTitle = document.createElement('h3'); yearTitle.className = 'year-group__title'; yearTitle.textContent = year;
             const papersGridDiv = document.createElement('div'); papersGridDiv.className = 'papers-grid';
-            papersByYear[year].sort((a, b) => {
-                 const sessionOrder = { 'FM': 1, 'MJ': 2, 'ON': 3 }; const sessionA = (a.sessionCode || '').toUpperCase(); const sessionB = (b.sessionCode || '').toUpperCase(); if (sessionOrder[sessionA] !== sessionOrder[sessionB]) return (sessionOrder[sessionA] || 99) - (sessionOrder[sessionB] || 99); const paperNumA = parseInt(a.paperNumber) || 99; const paperNumB = parseInt(b.paperNumber) || 99; if (paperNumA !== paperNumB) return paperNumA - paperNumB; const variantA = a.variant || ''; const variantB = b.variant || ''; return variantA.localeCompare(variantB);
-            }).forEach(paper => {
-                const paperCard = createPaperCard(paper); if (paperCard) { papersGridDiv.appendChild(paperCard); papersFound = true; }
-            });
+            papersByYear[year].sort((a, b) => { /* Sắp xếp paper trong năm */
+                const sa = { 'FM': 1, 'MJ': 2, 'ON': 3 }[a.sessionCode] || 9;
+                const sb = { 'FM': 1, 'MJ': 2, 'ON': 3 }[b.sessionCode] || 9;
+                if (sa !== sb) return sa - sb;
+                return (parseInt(a.paperNumber) || 99) - (parseInt(b.paperNumber) || 99);
+            }).forEach(paper => { const card = createPaperCard(paper); if (card) { papersGridDiv.appendChild(card); papersFound = true; }});
             if (papersGridDiv.hasChildNodes()) { yearGroupSection.appendChild(yearTitle); yearGroupSection.appendChild(papersGridDiv); papersListContainer.appendChild(yearGroupSection); }
         });
         noPapersMessage.hidden = papersFound;
-        if (!papersFound) { noPapersMessage.textContent = "No past papers found matching your filters."; }
+        if (!papersFound) noPapersMessage.textContent = "No past papers found for the current filters.";
     }
-    async function applyFiltersAndRender() { /* ... (logic không đổi, dùng paperStatuses đã fetch) ... */
+    function applyFiltersAndRender() {
+         if (!filterForm) return;
          const formData = new FormData(filterForm); const statusFilter = formData.get('status'); const yearFilter = formData.get('year'); const paperFilter = formData.get('paper');
          let filteredData = ALL_PAPER_DATA_SOURCE.filter(paper => {
              if (subjectFilterFromUrl && paper.subjectId !== subjectFilterFromUrl) return false;
@@ -624,27 +543,29 @@ function setupPapersPage_Dynamic() {
          });
          renderPapers(filteredData);
     }
+    if (mainTitle) {
+        if (subjectFilterFromUrl) {
+            const subjectData = ALL_PAPER_DATA_SOURCE.find(p => p.subjectId === subjectFilterFromUrl);
+            mainTitle.textContent = subjectData ? `${subjectData.subjectName || 'Subject'} (${subjectData.subjectCode || 'Code'}) Papers` : `Papers`;
+        } else { mainTitle.textContent = `All Past Papers`; }
+    }
+    if(applyFiltersBtn) applyFiltersBtn.addEventListener('click', applyFiltersAndRender);
 
-    if (subjectFilterFromUrl) {
-        const subjectData = ALL_PAPER_DATA_SOURCE.find(p => p.subjectId === subjectFilterFromUrl);
-        mainTitle.textContent = subjectData ? `${subjectData.subjectName || 'Subject'} (${subjectData.subjectCode || 'Code'}) Papers` : `Papers (Unknown Subject)`;
-    } else { mainTitle.textContent = `All Past Papers`; }
-
-    applyFiltersBtn.addEventListener('click', applyFiltersAndRender);
-
-    // Fetch statuses then render
-    fetchPaperStatuses().then(statuses => {
+    fetchPaperStatusesAndApplyMock().then(statuses => {
         paperStatuses = statuses;
-        applyFiltersAndRender(); // Initial Render after fetching statuses
+        applyFiltersAndRender();
     });
 }
 
-// ===== ATTEMPT PAGE LOGIC =====
+// ===== ATTEMPT PAGE LOGIC (Gọi API backend) =====
 async function setupAttemptContentViewer() {
-    // TODO: Sẽ được cập nhật để lấy dữ liệu từ backend
+    // ... (Copy toàn bộ nội dung hàm setupAttemptContentViewer từ phản hồi trước,
+    //      đảm bảo nó gọi fetchAttemptDetails và cập nhật UI)
     console.log("Setting up Attempt Page Content Viewer...");
     const viewer = document.getElementById('paper-viewer-content');
     const paperV = document.getElementById('past-paper-view');
+    const uploadedFileLinkContainer = document.getElementById('uploaded-file-link-container');
+    const uploadedFileLink = document.getElementById('uploaded-file-link');
     const feedV = document.getElementById('feedback-view');
     const outV = document.getElementById('outline-view');
     const paperB = document.getElementById('view-paper-btn');
@@ -659,79 +580,61 @@ async function setupAttemptContentViewer() {
     const confirmRetakeBtn = document.getElementById('confirm-retake-action-btn');
     const retakeModalCloseElements = retakeModal?.querySelectorAll('[data-close-modal], .modal__close-btn');
 
-    if (!viewer || !paperCodeHeading || !retakeButton) {
-        console.warn("Attempt page core elements missing.");
-        if(paperCodeHeading) paperCodeHeading.textContent = "Error Loading Attempt";
-        return;
-    }
+    if (!viewer || !paperCodeHeading || !retakeButton) { console.warn("Attempt page core elements missing."); if (paperCodeHeading) paperCodeHeading.textContent = "Error Loading"; return; }
 
     const { attemptId, paperId: paperIdFromUrl, validAttemptId } = getPaperInfoFromUrl();
     const currentUserId = getCurrentUsername();
 
     if (validAttemptId && currentUserId) {
         displayUserMessage("Loading attempt details...", "info");
-        // Hàm này sẽ được định nghĩa ở phần sau
         const attemptData = await fetchAttemptDetails(attemptId, currentUserId, paperIdFromUrl);
-
         if (attemptData) {
             const displayPaperId = attemptData.paperId || paperIdFromUrl;
             paperCodeHeading.textContent = formatPaperCode(displayPaperId);
             document.title = `${formatPaperCode(displayPaperId)} - Attempt - PaperBuddy`;
-            if(retakeButton) retakeButton.href = `test.html?paperId=${encodeURIComponent(displayPaperId || 'unknown-paper')}`;
-
+            if (retakeButton) retakeButton.href = `test.html?paperId=${encodeURIComponent(displayPaperId || 'unknown-paper')}`;
             if (gradeValueElement) gradeValueElement.textContent = attemptData.grade || 'N/A';
             if (durationValueElement) durationValueElement.textContent = formatTime(attemptData.timeSpent || 0);
             if (rawScoreValueElement) rawScoreValueElement.textContent = `${attemptData.score || 0} / 60`;
-
             if (feedV) feedV.innerHTML = `<p style="padding: 1rem;"><strong>Feedback:</strong></p><p style="padding: 0 1rem 1rem 1rem;">${attemptData.feedback?.replace(/\n/g, '<br>') || 'No feedback available.'}</p>`;
             if (outV) outV.innerHTML = `<p style="padding: 1rem;"><strong>Outline:</strong></p><pre style="padding: 0 1rem 1rem 1rem; white-space: pre-wrap;">${attemptData.outline || 'No outline available.'}</pre>`;
-
-            // Placeholder cho paper content - sau này có thể lấy link ảnh paper từ attemptData nếu có
-            if (paperV) { /* Giữ nguyên placeholder images */ }
-
+            if (uploadedFileLinkContainer && uploadedFileLink && attemptData.fileUrl) {
+                uploadedFileLink.href = attemptData.fileUrl;
+                uploadedFileLink.textContent = `View Uploaded File: ${attemptData.fileName || 'File'}`;
+                uploadedFileLinkContainer.style.display = 'block';
+            }
         } else {
-            paperCodeHeading.textContent = "Could not load attempt.";
-            displayUserMessage("Failed to load attempt details.", "error");
-            if(retakeButton) retakeButton.style.display = 'none';
+            paperCodeHeading.textContent = "Could not load attempt."; displayUserMessage("Failed to load attempt details.", "error");
+            if (retakeButton) retakeButton.style.display = 'none';
         }
     } else {
         paperCodeHeading.textContent = "Invalid Attempt or Not Logged In";
-        if (!validAttemptId) displayUserMessage("Attempt ID is missing or invalid in the URL.", "error");
-        if (!currentUserId) displayUserMessage("You must be logged in to view attempts.", "error");
-        if(retakeButton) retakeButton.style.display = 'none';
+        if (!validAttemptId) displayUserMessage("Attempt ID is missing or invalid.", "error");
+        if (!currentUserId) displayUserMessage("You must be logged in.", "error");
+        if (retakeButton) retakeButton.style.display = 'none';
     }
-
-    // View Switching Logic (giữ nguyên)
     if (paperV && feedV && outV && paperB && feedB && outB) {
         const views = [paperV, feedV, outV]; const buttons = [paperB, feedB, outB];
-        const showView = (viewToShow) => { views.forEach(view => { view.hidden = (view !== viewToShow); }); if(viewer) viewer.scrollTop = 0; };
-        const setActiveButton = (buttonToActivate) => { buttons.forEach(btn => { btn.setAttribute('aria-current', btn === buttonToActivate ? 'page' : 'false'); }); };
-        buttons.forEach((button, index) => { button.addEventListener('click', (e) => { e.preventDefault(); showView(views[index]); setActiveButton(button); }); });
-        showView(paperV); setActiveButton(paperB); // Default view
+        const showView = (view) => { views.forEach(v => v.hidden = (v !== view)); if(viewer) viewer.scrollTop = 0; };
+        const setActive = (btn) => buttons.forEach(b => b.setAttribute('aria-current', b === btn ? 'page' : 'false'));
+        buttons.forEach((btn, i) => btn.addEventListener('click', (e) => { e.preventDefault(); showView(views[i]); setActive(btn); }));
+        showView(paperV); setActive(paperB);
     }
-
-
-    // Retake Modal Logic (giữ nguyên)
-    if (retakeModal && confirmRetakeBtn && retakeModalCloseElements && retakeButton) {
-        let previouslyFocusedElementRetake = null; let targetRetakeUrl = '';
-        const openRetakeModal = () => { previouslyFocusedElementRetake = document.activeElement; openModal(retakeModal, confirmRetakeBtn); };
-        const closeRetakeModal = () => { closeModal(retakeModal, previouslyFocusedElementRetake); };
-        retakeButton.addEventListener('click', (event) => {
-            event.preventDefault(); targetRetakeUrl = retakeButton.href;
-            if (targetRetakeUrl && !targetRetakeUrl.includes('unknown-paper')) { openRetakeModal(); }
-            else { console.error("Cannot retake, paper ID unknown:", targetRetakeUrl); displayUserMessage("Could not determine the paper for retake.", "error"); }
-        });
-        confirmRetakeBtn.addEventListener('click', () => {
-            closeRetakeModal();
-            setTimeout(() => { if(targetRetakeUrl && !targetRetakeUrl.includes('unknown-paper')) { window.location.href = targetRetakeUrl; } else { displayUserMessage("Error starting retake.", "error");} }, 100);
-        });
-        retakeModalCloseElements.forEach(el => el.addEventListener('click', closeRetakeModal));
-        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && retakeModal?.classList.contains('is-visible')) closeRetakeModal(); });
+    if (retakeModal && confirmRetakeBtn && retakeModalCloseElements && retakeButton) { /* Retake modal logic (giữ nguyên) */
+        let prevFocusRetake = null, targetUrl = '';
+        const openRetake = () => { prevFocusRetake = document.activeElement; openModal(retakeModal, confirmRetakeBtn); };
+        const closeRetake = () => closeModal(retakeModal, prevFocusRetake);
+        retakeButton.addEventListener('click', (e) => { e.preventDefault(); targetUrl = retakeButton.href; if (targetUrl && !targetUrl.includes('unknown')) openRetake(); else displayUserMessage("Cannot retake, paper ID unknown.", "error");});
+        confirmRetakeBtn.addEventListener('click', () => { closeRetake(); setTimeout(() => { if(targetUrl && !targetUrl.includes('unknown')) window.location.href = targetUrl; else displayUserMessage("Error starting retake.", "error");}, 100);});
+        retakeModalCloseElements.forEach(el => el.addEventListener('click', closeRetake));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && retakeModal?.classList.contains('is-visible')) closeRetake(); });
     }
 }
 
-// ===== TEST PAGE LOGIC (CẬP NHẬT CHÍNH Ở ĐÂY) =====
+// ===== TEST PAGE LOGIC (Đã cập nhật để gọi API backend) =====
 async function setupTestPage() {
+    // ... (Copy toàn bộ nội dung hàm setupTestPage từ phản hồi trước,
+    //      đảm bảo nó gọi uploadFileToFirebase và API submit_attempt)
     console.log("Setting up Test Page Timer and Submission...");
     const timerDisplay = document.getElementById('timer-display');
     const timerButton = document.getElementById('timer-button');
@@ -744,158 +647,66 @@ async function setupTestPage() {
     const fileUploadFilename = document.getElementById('file-upload-filename');
 
     if (!timerDisplay || !timerButton || !confirmModal || !confirmSubmitBtn || !paperCodeHeading || !answerTextarea || !fileUploadInput || !fileUploadFilename) {
-        console.warn("Test page elements missing. Aborting setup.");
-        if (paperCodeHeading) paperCodeHeading.textContent = "Error Loading Test";
-        return;
+        console.warn("Test page elements missing."); if(paperCodeHeading) paperCodeHeading.textContent = "Error Loading Test"; return;
     }
-
     const { paperId, validPaperId } = getPaperInfoFromUrl();
     if (!validPaperId) {
-        paperCodeHeading.textContent = "Invalid Paper ID";
-        document.title = `Invalid Test - PaperBuddy`;
-        timerButton.disabled = true; timerButton.textContent = "Invalid Paper";
-        displayUserMessage("Paper ID is missing or invalid for this test session.", "error");
-        return;
+        paperCodeHeading.textContent = "Invalid Paper ID"; document.title = `Invalid Test - PaperBuddy`;
+        if(timerButton) {timerButton.disabled = true; timerButton.textContent = "Invalid Paper";}
+        displayUserMessage("Paper ID is missing or invalid.", "error"); return;
     }
-    paperCodeHeading.textContent = formatPaperCode(paperId);
+    if(paperCodeHeading) paperCodeHeading.textContent = formatPaperCode(paperId);
     document.title = `${formatPaperCode(paperId)} - Test - PaperBuddy`;
-
-    let timerInterval = null; let secondsElapsed = 0; let isTimerRunning = false; let previouslyFocusedElementTest = null;
-
-    const updateDisplay = () => { if(timerDisplay) timerDisplay.textContent = formatTime(secondsElapsed); };
-    const startTimer = () => { /* ... (logic không đổi) ... */
-        if (isTimerRunning) return;
-        isTimerRunning = true; secondsElapsed = 0; updateDisplay();
-        timerInterval = setInterval(() => { secondsElapsed++; updateDisplay(); }, 1000);
-        timerButton.textContent = 'Submit'; timerButton.dataset.action = 'submit';
-        answerTextarea.disabled = false; fileUploadInput.disabled = false;
-        if (!fileUploadInput.files[0]) { answerTextarea.placeholder = "Type your final answer here..."; }
-    };
-    const stopTimer = () => { clearInterval(timerInterval); isTimerRunning = false; };
-    const openTestModal = () => { /* ... (logic không đổi) ... */
-        const answerText = answerTextarea.value.trim(); const uploadedFile = fileUploadInput.files[0];
-        if (!answerText && !uploadedFile) { displayUserMessage("Please enter an answer or upload a file before submitting.", "warning"); answerTextarea.focus(); return; }
-        previouslyFocusedElementTest = document.activeElement; openModal(confirmModal, confirmSubmitBtn);
-    };
-    const closeTestModal = () => { closeModal(confirmModal, previouslyFocusedElementTest); };
-
-    timerButton.addEventListener('click', () => {
-        const action = timerButton.dataset.action; if (action === 'start') startTimer(); else if (action === 'submit') openTestModal();
-    });
-    fileUploadInput.addEventListener('change', () => { /* ... (logic không đổi) ... */
-        const file = fileUploadInput.files[0];
-        if (file) {
-            fileUploadFilename.textContent = `Selected file: ${file.name}`;
-            answerTextarea.disabled = true; answerTextarea.placeholder = "File selected. Clear selection to type answer."; answerTextarea.value = "";
-        } else {
-            fileUploadFilename.textContent = '';
-            if (isTimerRunning) { answerTextarea.disabled = false; answerTextarea.placeholder = "Type your final answer here..."; }
-            else { answerTextarea.disabled = true; answerTextarea.placeholder = "Start the exam to type or upload."; }
+    let timerInterval = null, secondsElapsed = 0, isTimerRunning = false, prevFocusTest = null;
+    const updateDisp = () => { if(timerDisplay) timerDisplay.textContent = formatTime(secondsElapsed); };
+    const startT = () => { if (isTimerRunning) return; isTimerRunning = true; secondsElapsed = 0; updateDisp(); timerInterval = setInterval(() => { secondsElapsed++; updateDisp(); }, 1000); if(timerButton) {timerButton.textContent = 'Submit'; timerButton.dataset.action = 'submit';} if(answerTextarea) answerTextarea.disabled = false; if(fileUploadInput) fileUploadInput.disabled = false; if(answerTextarea && !fileUploadInput.files[0]) answerTextarea.placeholder = "Type final answer...";};
+    const stopT = () => { clearInterval(timerInterval); isTimerRunning = false; };
+    const openTestM = () => { const ans = answerTextarea.value.trim(), file = fileUploadInput.files[0]; if (!ans && !file) { displayUserMessage("Please enter an answer or upload a file.", "warning"); answerTextarea.focus(); return; } prevFocusTest = document.activeElement; openModal(confirmModal, confirmSubmitBtn);};
+    const closeTestM = () => closeModal(confirmModal, prevFocusTest);
+    if(timerButton) timerButton.addEventListener('click', () => { const act = timerButton.dataset.action; if (act === 'start') startT(); else if (act === 'submit') openTestM(); });
+    if(fileUploadInput) fileUploadInput.addEventListener('change', () => { const file = fileUploadInput.files[0]; if (file) { if(fileUploadFilename) fileUploadFilename.textContent = `File: ${file.name}`; if(answerTextarea) {answerTextarea.disabled = true; answerTextarea.placeholder = "File selected."; answerTextarea.value = "";}} else { if(fileUploadFilename) fileUploadFilename.textContent = ''; if(answerTextarea) {if(isTimerRunning) {answerTextarea.disabled = false; answerTextarea.placeholder = "Type final answer...";} else {answerTextarea.disabled = true; answerTextarea.placeholder = "Start exam to type/upload.";}}}});
+    if(confirmSubmitBtn) confirmSubmitBtn.addEventListener('click', async () => {
+        if (isTimerRunning) stopT();
+        const userId = getCurrentUsername();
+        if (!userId) { displayUserMessage("You must be logged in.", "error"); triggerLoginModal(null, confirmSubmitBtn); closeTestM(); return;}
+        if (!validPaperId) { displayUserMessage("Cannot submit: Invalid Paper ID.", "error"); closeTestM(); return;}
+        const ansText = answerTextarea.value.trim(); const localFile = fileUploadInput.files[0];
+        let fileRes = null;
+        confirmSubmitBtn.disabled = true; confirmSubmitBtn.textContent = "Processing...";
+        if (localFile) {
+            displayUserMessage("Uploading file...", "info");
+            fileRes = await uploadFileToFirebase(localFile, userId, paperId);
+            if (!fileRes) { displayUserMessage("File upload failed. Submission canceled.", "error"); confirmSubmitBtn.disabled = false; confirmSubmitBtn.textContent = "Confirm Submit"; return; }
         }
-    });
-
-    // --- SUBMIT LOGIC (ĐÃ CẬP NHẬT) ---
-    confirmSubmitBtn.addEventListener('click', async () => {
-        if (isTimerRunning) stopTimer();
-
-        const currentUserId = getCurrentUsername();
-        if (!currentUserId) {
-            displayUserMessage("You must be logged in to submit an attempt.", "error");
-            triggerLoginModal(null, confirmSubmitBtn); // Mở modal login
-            closeTestModal();
-            return;
-        }
-        if (!validPaperId) { // Kiểm tra lại paperId
-            displayUserMessage("Cannot submit: Invalid Paper ID.", "error");
-            closeTestModal();
-            return;
-        }
-
-        const answerText = answerTextarea.value.trim();
-        const localFileToUpload = fileUploadInput.files[0];
-        let fileUploadResult = null;
-
-        // 1. Upload file (nếu có)
-        if (localFileToUpload) {
-            // Disable submit button while uploading
-            confirmSubmitBtn.disabled = true;
-            confirmSubmitBtn.textContent = "Uploading...";
-            fileUploadResult = await uploadFileToFirebase(localFileToUpload, currentUserId, paperId);
-            confirmSubmitBtn.disabled = false; // Re-enable button
-            confirmSubmitBtn.textContent = "Confirm Submit";
-
-            if (!fileUploadResult) {
-                displayUserMessage("File upload failed. Submission canceled.", "error");
-                // Không đóng modal để user có thể thử lại hoặc sửa lỗi
-                return; // Dừng, không submit nếu upload lỗi
-            }
-        }
-
-        // 2. Chuẩn bị payload
-        const submissionPayload = {
-            action: 'submit_attempt',
-            payload: {
-                paperId: paperId,
-                userId: currentUserId,
-                answerText: answerText,
-                fileUrl: fileUploadResult ? fileUploadResult.url : null,
-                fileName: fileUploadResult ? fileUploadResult.name : null,
-                timeSpent: secondsElapsed
-            }
-        };
-
-        // 3. Gọi Netlify Function
+        const submissionPayload = { action: 'submit_attempt', payload: { paperId, userId, answerText: ansText, fileUrl: fileRes?.url, fileName: fileRes?.name, timeSpent: secondsElapsed }};
         try {
-            displayUserMessage("Submitting your attempt to be graded...", "info", 10000);
-            confirmSubmitBtn.disabled = true; // Disable button during API call
-            confirmSubmitBtn.textContent = "Submitting...";
-
-            const response = await fetch('/.netlify/functions/backend', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(submissionPayload)
-            });
+            displayUserMessage("Submitting attempt for grading...", "info", 10000);
+            const response = await fetch('/.netlify/functions/backend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submissionPayload) });
             const data = await response.json();
-
-            confirmSubmitBtn.disabled = false; // Re-enable
-            confirmSubmitBtn.textContent = "Confirm Submit";
-
-            if (!response.ok) {
-                console.error('Submission failed on server:', data.error, data.details);
-                displayUserMessage(`Submission error: ${data.error || 'Unknown server error.'}`, 'error');
-                // Không đóng modal để user thấy lỗi
-                return;
-            }
-
-            // Thành công (response.ok là true)
-            console.log('Attempt submitted and graded:', data);
-            // data bây giờ chứa attemptId, grade, score, feedback từ backend
-            // Chuyển hướng đến result.html với attemptId và paperId từ response
-            const resultUrl = `result.html?attemptId=${data.attemptId}&paperId=${data.paperId}`;
-            displayUserMessage("Submission successful! Redirecting to results...", "success");
-            setTimeout(() => { window.location.href = resultUrl; }, 1500); // Delay để user thấy message
-
+            if (!response.ok) { throw new Error(data.error || `Server error: ${response.status}`);}
+            console.log('Attempt submitted:', data);
+            displayUserMessage("Submission successful! Redirecting...", "success");
+            setTimeout(() => { window.location.href = `result.html?attemptId=${data.attemptId}&paperId=${data.paperId}`; }, 1500);
         } catch (error) {
-            console.error('Error submitting attempt via fetch:', error);
-            displayUserMessage('Network error or server issue during submission. Please try again.', 'error');
-            confirmSubmitBtn.disabled = false;
-            confirmSubmitBtn.textContent = "Confirm Submit";
-            // Không đóng modal
+            console.error('Error submitting attempt:', error);
+            displayUserMessage(`Submission error: ${error.message}`, 'error');
         } finally {
-            // Không tự động đóng modal ở đây nữa, để user thấy thông báo lỗi nếu có
-            // closeTestModal(); //  Chỉ đóng nếu thành công ở trên
+            confirmSubmitBtn.disabled = false; confirmSubmitBtn.textContent = "Confirm Submit";
+            // Không đóng modal ở đây để user thấy lỗi nếu có
         }
     });
-
-    modalCloseElements.forEach(el => el.addEventListener('click', closeTestModal));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && confirmModal?.classList.contains('is-visible')) closeTestModal(); });
-    updateDisplay();
-    answerTextarea.disabled = true; fileUploadInput.disabled = true; answerTextarea.placeholder = "Start the exam to type or upload.";
+    modalCloseElements.forEach(el => el.addEventListener('click', closeTestM));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && confirmModal?.classList.contains('is-visible')) closeTestM(); });
+    updateDisp();
+    if(answerTextarea) { answerTextarea.disabled = true; answerTextarea.placeholder = "Start the exam to type or upload.";}
+    if(fileUploadInput) fileUploadInput.disabled = true;
 }
 
-// ===== RESULT PAGE LOGIC =====
+// ===== RESULT PAGE LOGIC (Gọi API backend) =====
 async function setupResultPage() {
-    // TODO: Sẽ được cập nhật đầy đủ để lấy và hiển thị dữ liệu từ backend
+    // ... (Copy toàn bộ nội dung hàm setupResultPage từ phản hồi trước,
+    //      đảm bảo nó gọi fetchAttemptDetails và cập nhật UI,
+    //      và logic delete button đã được cập nhật để gọi API backend)
     console.log("Setting up Result Page...");
     const deleteButton = document.getElementById('delete-attempt-btn');
     const deleteModal = document.getElementById('confirm-delete-modal');
@@ -908,107 +719,94 @@ async function setupResultPage() {
     const secAScoreEl = document.querySelector('[aria-labelledby="section-a-heading"] .section-score-summary');
     const secBScoreEl = document.querySelector('[aria-labelledby="section-b-heading"] .section-score-summary');
     const secCScoreEl = document.querySelector('[aria-labelledby="section-c-heading"] .section-score-summary');
+    const viewFullAttemptBtn = document.getElementById('view-full-attempt-btn');
 
-    if (!paperCodeHeading || !durationElement || !gradeValueElement || !rawScoreElement) {
-        console.warn("Result page core display elements missing.");
-        if(paperCodeHeading) paperCodeHeading.textContent = "Error Loading Result";
-        return;
-    }
+    if (!paperCodeHeading || !durationElement || !gradeValueElement || !rawScoreElement) { console.warn("Result page display elements missing."); if(paperCodeHeading) paperCodeHeading.textContent = "Error"; return; }
 
     const { attemptId, paperId: paperIdFromUrl, validAttemptId } = getPaperInfoFromUrl();
     const currentUserId = getCurrentUsername();
 
     if (validAttemptId && currentUserId) {
         displayUserMessage("Loading result details...", "info");
-        const attemptData = await fetchAttemptDetails(attemptId, currentUserId, paperIdFromUrl); // Hàm này sẽ được tạo
-
+        const attemptData = await fetchAttemptDetails(attemptId, currentUserId, paperIdFromUrl);
         if (attemptData) {
             const displayPaperId = attemptData.paperId || paperIdFromUrl;
-            paperCodeHeading.textContent = formatPaperCode(displayPaperId);
+            if(paperCodeHeading) paperCodeHeading.textContent = formatPaperCode(displayPaperId);
             document.title = `${formatPaperCode(displayPaperId)} - Result - PaperBuddy`;
-
-            gradeValueElement.textContent = attemptData.grade || 'N/A';
-            durationElement.textContent = formatTime(attemptData.timeSpent || 0);
-            rawScoreElement.textContent = `${attemptData.score || 0} / 60`;
-
+            if(gradeValueElement) gradeValueElement.textContent = attemptData.grade || 'N/A';
+            if(durationElement) durationElement.textContent = formatTime(attemptData.timeSpent || 0);
+            if(rawScoreElement) rawScoreElement.textContent = `${attemptData.score || 0} / 60`;
             if (attemptData.sectionScores) {
                 if (secAScoreEl) secAScoreEl.textContent = attemptData.sectionScores.sectionA || 'N/A';
                 if (secBScoreEl) secBScoreEl.textContent = attemptData.sectionScores.sectionB || 'N/A';
                 if (secCScoreEl) secCScoreEl.textContent = attemptData.sectionScores.sectionC || 'N/A';
-            } else {
-                if (secAScoreEl) secAScoreEl.textContent = 'N/A';
-                if (secBScoreEl) secBScoreEl.textContent = 'N/A';
-                if (secCScoreEl) secCScoreEl.textContent = 'N/A';
             }
-            // TODO: Populate feedback and outline if these are to be shown on result page directly
-            // Otherwise, they are on attempt.html
+            if(viewFullAttemptBtn) viewFullAttemptBtn.href = `attempt.html?attemptId=${encodeURIComponent(attemptId)}&paperId=${encodeURIComponent(displayPaperId)}`;
 
         } else {
-            paperCodeHeading.textContent = "Could not load result details.";
-            displayUserMessage("Failed to load result details. The attempt may not exist or an error occurred.", "error");
-            // Disable delete button if data load fails
+            if(paperCodeHeading) paperCodeHeading.textContent = "Could not load result."; displayUserMessage("Failed to load result details.", "error");
             if (deleteButton) deleteButton.disabled = true;
         }
     } else {
-        paperCodeHeading.textContent = "Invalid Result or Not Logged In";
-        if (!validAttemptId) displayUserMessage("Attempt ID is missing or invalid in the URL.", "error");
-        if (!currentUserId) displayUserMessage("You must be logged in to view results.", "error");
+        if(paperCodeHeading) paperCodeHeading.textContent = "Invalid Result/Login";
+        if (!validAttemptId) displayUserMessage("Attempt ID invalid.", "error");
+        if (!currentUserId) displayUserMessage("You must be logged in.", "error");
         if (deleteButton) deleteButton.disabled = true;
     }
-
-    // Delete Button Logic (cần cập nhật để gọi backend)
     if (deleteButton && deleteModal && confirmDeleteBtn && modalCloseElements) {
-        let previouslyFocusedElementResult = null;
-        const openDeleteModal = () => { previouslyFocusedElementResult = document.activeElement; openModal(deleteModal, confirmDeleteBtn); };
-        const closeDeleteModal = () => { closeModal(deleteModal, previouslyFocusedElementResult); };
-
-        deleteButton.addEventListener('click', () => {
-            if (validAttemptId && currentUserId) openDeleteModal();
-            else displayUserMessage("Cannot delete: Attempt ID missing or not logged in.", "error");
-        });
-
+        let prevFocusResult = null;
+        const openDelModal = () => { prevFocusResult = document.activeElement; openModal(deleteModal, confirmDeleteBtn); };
+        const closeDelModal = () => closeModal(deleteModal, prevFocusResult);
+        deleteButton.addEventListener('click', () => { if (validAttemptId && currentUserId) openDelModal(); else displayUserMessage("Cannot delete: Invalid ID or not logged in.", "error");});
         confirmDeleteBtn.addEventListener('click', async () => {
-            // Logic gọi backend để xóa (sẽ hoàn thiện ở giai đoạn sau)
-            // ...
-            displayUserMessage("Delete functionality will be fully implemented soon.", "info");
-            closeDeleteModal();
+            if (!validAttemptId || !currentUserId) { displayUserMessage("Deletion error.", "error"); closeDelModal(); return; }
+            confirmDeleteBtn.disabled = true; confirmDeleteBtn.textContent = "Deleting...";
+            try {
+                const response = await fetch('/.netlify/functions/backend', {
+                    method: 'POST', // Hoặc 'DELETE' nếu backend hỗ trợ
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'delete_attempt', payload: { attemptId, userId: currentUserId, paperId: paperIdFromUrl } })
+                });
+                const data = await response.json();
+                if (!response.ok) { throw new Error(data.error || `Server error: ${response.status}`); }
+                displayUserMessage("Attempt deleted successfully! Redirecting...", "success");
+                const redirPaperId = data.relatedPaperId || paperIdFromUrl; // Lấy paperId từ response nếu có
+                const subjectIdForRedirect = redirPaperId ? ALL_PAPER_DATA_SOURCE.find(p => p.id === redirPaperId)?.subjectId : null;
+                const redirectUrl = subjectIdForRedirect ? `papers.html?subject=${encodeURIComponent(subjectIdForRedirect)}` : 'papers.html';
+                setTimeout(() => { window.location.href = redirectUrl; }, 1500);
+            } catch (error) {
+                console.error('Error deleting attempt:', error);
+                displayUserMessage(`Delete error: ${error.message}`, 'error');
+            } finally {
+                confirmDeleteBtn.disabled = false; confirmDeleteBtn.textContent = "Confirm Delete";
+                closeDelModal();
+            }
         });
-        modalCloseElements.forEach(el => el.addEventListener('click', closeDeleteModal));
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && deleteModal?.classList.contains('is-visible')) closeDeleteModal(); });
+        modalCloseElements.forEach(el => el.addEventListener('click', closeDelModal));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && deleteModal?.classList.contains('is-visible')) closeDelModal(); });
     }
-
-
-    // Placeholder Download Listeners
-    const downloadFeedbackBtn = document.getElementById('download-feedback-btn');
-    const downloadOutlineBtn = document.getElementById('download-outline-btn');
-    const placeholderDownloadHandler = (e, type) => {
-        e.preventDefault();
-        console.log(`${type} download feature not implemented yet.`);
-        displayUserMessage(`Download ${type} feature not implemented yet.`, 'info');
-    };
-    if (downloadFeedbackBtn) downloadFeedbackBtn.addEventListener('click', (e) => placeholderDownloadHandler(e, 'feedback'));
-    if (downloadOutlineBtn) downloadOutlineBtn.addEventListener('click', (e) => placeholderDownloadHandler(e, 'outline'));
+    const dlFeedbackBtn = document.getElementById('download-feedback-btn');
+    const dlOutlineBtn = document.getElementById('download-outline-btn');
+    const dlHandler = (e, type) => { e.preventDefault(); displayUserMessage(`Download ${type} not implemented.`, 'info');};
+    if (dlFeedbackBtn) dlFeedbackBtn.addEventListener('click', (e) => dlHandler(e, 'feedback'));
+    if (dlOutlineBtn) dlOutlineBtn.addEventListener('click', (e) => dlHandler(e, 'outline'));
 }
 
 
 // --- HÀM CHUNG ĐỂ LẤY CHI TIẾT ATTEMPT TỪ BACKEND ---
 async function fetchAttemptDetails(attemptId, userId, paperIdForLog) {
+    // ... (Giữ nguyên logic hàm này như đã cung cấp ở phản hồi trước)
     if (!attemptId || !userId) {
-        console.error("Missing attemptId or userId to fetch details.");
-        return null;
+        console.error("Missing attemptId or userId to fetch details."); return null;
     }
     try {
         const response = await fetch(`/.netlify/functions/backend?action=get_attempt_details&attemptId=${encodeURIComponent(attemptId)}&userId=${encodeURIComponent(userId)}&paperId=${encodeURIComponent(paperIdForLog || '')}`);
-        // Thêm paperIdForLog vào query để backend có thể log nếu cần, nhưng backend chủ yếu dùng attemptId và userId để query
+        if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.error || `Server error: ${response.status}`);}
         const data = await response.json();
-
-        if (!response.ok) {
-            console.error('Failed to fetch attempt details from server:', data.error, data.details);
-            return null;
-        }
-        return data; // data chứa toàn bộ thông tin attempt từ Firestore
+        return data;
     } catch (error) {
         console.error('Network error fetching attempt details:', error);
+        displayUserMessage(`Error loading details: ${error.message}`, "error"); // Hiển thị lỗi cho user
         return null;
     }
 }
