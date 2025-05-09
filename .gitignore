@@ -1,0 +1,6 @@
+# Don't upload secret keys
+.env
+firebase-key.json
+
+# Don't upload temporary logs
+*.log
