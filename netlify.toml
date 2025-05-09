@@ -1,5 +1,3 @@
 [build]
 publish = "Frontend"
-command = ""git add netlify.toml
-git commit -m "Fix publish directory path for Netlify"
-git push
+command = ""
