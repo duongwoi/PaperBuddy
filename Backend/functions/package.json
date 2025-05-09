@@ -1,0 +1,10 @@
+{
+  "name": "paperbuddy-backend-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for PaperBuddy",
+  "main": "backend.js",
+  "dependencies": {
+    "firebase-admin": "^11.11.1",
+    "openai": "^4.28.0"
+  }
+}

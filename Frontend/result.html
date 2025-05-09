@@ -27,7 +27,7 @@
                 <!-- Logged Out State (Default) -->
                 <a href="#" class="nav__button-link" id="login-trigger-btn" data-open-modal="login-modal">Log in</a>
                 <a href="#" class="nav__button button button--primary" id="join-trigger-btn" data-open-modal="login-modal">Join now</a>
-            
+
                 <!-- Logged In State (Initially Hidden by JS/CSS potentially) -->
                 <div id="user-info" class="nav__user-info" style="display: none;"> <!-- Hide initially -->
                      <span class="nav__username" id="nav-username-display">User Name</span>
@@ -61,15 +61,15 @@
                         <div class="grade-details-content">
                             <p class="detail-item">
                                 <span class="detail-label">Grade:</span>
-                                <span class="detail-value detail-value--grade">A</span> <!-- Placeholder -->
+                                <span class="detail-value detail-value--grade">--</span> <!-- Placeholder, JS sẽ cập nhật -->
                             </p>
                             <p class="detail-item">
                                 <span class="detail-label">Duration:</span>
-                                <span class="detail-value">1h 32m</span> <!-- Placeholder -->
+                                <span class="detail-value">--:--:--</span> <!-- Placeholder, JS sẽ cập nhật -->
                             </p>
                             <p class="detail-item">
                                 <span class="detail-label">Raw Score:</span>
-                                <span class="detail-value">45 / 60</span> <!-- Placeholder -->
+                                <span class="detail-value">-- / 60</span> <!-- Placeholder, JS sẽ cập nhật -->
                             </p>
                         </div>
                     </article>
@@ -77,24 +77,28 @@
                     <!-- Block 2: Section A Summary -->
                     <article class="result-block result-block--section-summary" aria-labelledby="section-a-heading">
                         <h3 id="section-a-heading" class="result-block__title">Section A</h3>
-                         <p class="section-score-summary">15 / 20</p> <!-- Placeholder: Cần thay bằng điểm thực -->
+                         <p class="section-score-summary">-- / 20</p> <!-- Placeholder, JS sẽ cập nhật -->
                     </article>
 
                     <!-- Block 3: Section B Summary -->
                     <article class="result-block result-block--section-summary" aria-labelledby="section-b-heading">
                         <h3 id="section-b-heading" class="result-block__title">Section B</h3>
-                         <p class="section-score-summary">18 / 20</p> <!-- Placeholder -->
+                         <p class="section-score-summary">-- / 20</p> <!-- Placeholder, JS sẽ cập nhật -->
                     </article>
 
                     <!-- Block 4: Section C Summary -->
                     <article class="result-block result-block--section-summary" aria-labelledby="section-c-heading">
                         <h3 id="section-c-heading" class="result-block__title">Section C</h3>
-                         <p class="section-score-summary">12 / 20</p> <!-- Placeholder -->
+                         <p class="section-score-summary">-- / 20</p> <!-- Placeholder, JS sẽ cập nhật -->
                     </article>
                 </div>
 
                 <!-- Bottom Row: Action Buttons -->
                 <div class="result-actions__row">
+                    <!-- TODO: Cập nhật href cho nút View Full Attempt để trỏ tới attempt.html -->
+                    <a href="attempt.html" class="button result-action-button" id="view-full-attempt-btn">
+                        View full attempt & feedback
+                    </a>
                     <a href="#download-feedback" download="detailed-feedback.pdf" class="button result-action-button" id="download-feedback-btn">
                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="button-icon" viewBox="0 0 16 16"> <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/> <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/> </svg>
                         Download detailed feedback
@@ -136,7 +140,15 @@
         </div>
     </div>
 
+    <!-- Element để hiển thị user messages -->
+    <div id="user-message-toast" class="toast" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 5px; color: white; z-index: 10000;"></div>
+
     <!-- ===== JAVASCRIPT ===== -->
+    <!-- Firebase App (Core) - LUÔN CẦN THIẾT -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <!-- Firebase Storage - CHO UPLOAD FILE (Có thể không cần ở trang result, nhưng để nhất quán) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage-compat.js"></script>
+
     <script src="script.js" defer></script>
 </body>
 </html>

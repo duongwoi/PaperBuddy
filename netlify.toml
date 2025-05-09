@@ -1,3 +1,17 @@
 [build]
-publish = "Frontend"
-command = ""
+  # Chỉ định thư mục publish chứa các file frontend
+  # Dựa trên cấu trúc của bạn, đây nên là "Frontend"
+  publish = "Frontend"
+  command = ""  # Không cần build command nếu bạn không dùng bundler/transpiler cho frontend
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  # Chỉ định thư mục chứa Netlify Functions của bạn
+  # Dựa trên cấu trúc mới, đây là "Backend/functions"
+  directory = "Backend/functions"
+  node_bundler = "esbuild" # esbuild là một lựa chọn tốt, nhanh chóng.
+                          # Netlify cũng sẽ tự động cố gắng bundle.

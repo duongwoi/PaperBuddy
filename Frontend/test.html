@@ -96,7 +96,7 @@
                  </div>
                  <h3 id="upload-heading" class="upload-alternative__title">upload document</h3>
                  <div class="file-upload-area">
-                    <input type="file" id="file-upload-input" class="file-upload-input" accept=".pdf,.doc,.docx,.txt" aria-labelledby="upload-heading" disabled> <!-- Disabled initially -->
+                    <input type="file" id="file-upload-input" class="file-upload-input" accept=".pdf,.doc,.docx,.txt,.png,.jpeg,.jpg" aria-labelledby="upload-heading" disabled> <!-- Disabled initially, added image types -->
                     <label for="file-upload-input" class="file-upload-label">
                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-upload"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         <span class="file-upload-text">Drag file here or click to select</span>
@@ -131,7 +131,17 @@
         </div>
     </div>
 
+    <!-- Element để hiển thị user messages -->
+    <div id="user-message-toast" class="toast" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 5px; color: white; z-index: 10000;"></div>
+
     <!-- ===== JAVASCRIPT ===== -->
+    <!-- Firebase App (Core) - LUÔN CẦN THIẾT -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <!-- Firebase Storage - CHO UPLOAD FILE -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage-compat.js"></script>
+    <!-- (Tùy chọn) Firebase Auth - NẾU BẠN DÙNG FIREBASE AUTH -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script> -->
+
     <script src="script.js" defer></script>
 </body>
 </html>

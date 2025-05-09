@@ -59,40 +59,21 @@
                     <h2 class="visually-hidden">Content Viewer</h2>
                     <!-- Past Paper View -->
                     <div id="past-paper-view">
-                        <p style="padding: 1rem; text-align: center;"><i>Past paper content loads here...</i></p>
-                        <!-- ADDED loading="lazy" -->
+                        <p style="padding: 1rem; text-align: center;"><i>Past paper content loads here... If this attempt included a file, it might be linked here or shown below.</i></p>
+                        <!-- Link to uploaded file (JS will populate this if fileUrl exists) -->
+                        <p id="uploaded-file-link-container" style="padding: 0 1rem 1rem 1rem; text-align: center; display: none;">
+                            <a id="uploaded-file-link" href="#" target="_blank" rel="noopener noreferrer">View Uploaded File</a>
+                        </p>
                         <img src="images/placeholder-paper-content.png" alt="Scanned past paper content" style="width: 100%; height: auto;" loading="lazy">
-                        <!-- ADDED loading="lazy" -->
                         <img src="images/placeholder-paper-content.png" alt="Scanned past paper content page 2" style="width: 100%; height: auto; margin-top: 10px;" loading="lazy">
-                        <!-- Add more placeholders with loading="lazy" if needed -->
                     </div>
                     <!-- Feedback View -->
                     <div id="feedback-view" hidden style="padding: 1rem;">
-                         <p><i>Previous attempt & feedback content loads here...</i></p>
-                         <p>Overall: Good analysis, but need more specific examples for Section B.</p> <!-- Placeholder -->
-                         <p>Score Breakdown: Sec A (15/20), Sec B (18/20), Sec C (12/20)</p> <!-- Placeholder -->
+                         <p><i>Loading feedback...</i></p> <!-- JS sẽ cập nhật -->
                     </div>
                     <!-- Outline View -->
                     <div id="outline-view" hidden style="padding: 1rem;">
-                         <p><i>Outline content loads here...</i></p>
-                         <pre>
-Section A: Define key terms...
-- Term 1: Definition + Example
-- Term 2: Definition + Example
-
-Section B: Analysis
-- Point 1 (e.g., Advantage)
-  - Explanation
-  - Example from case study
-- Point 2 (e.g., Disadvantage)
-  - Explanation
-  - Example from case study
-
-Section C: Evaluation
-- Argument For
-- Argument Against
-- Conclusion/Recommendation
-                         </pre> <!-- Placeholder -->
+                         <p><i>Loading outline...</i></p> <!-- JS sẽ cập nhật -->
                     </div>
                 </div>
             </div>
@@ -104,18 +85,15 @@ Section C: Evaluation
                     <h2 id="grade-heading" class="visually-hidden">Attempt Summary</h2>
                      <div class="detail-item">
                         <span class="detail-label">Grade:</span>
-                        <!-- Placeholder: A, B, C, D, E, U - Not updated by current JS -->
-                        <span class="detail-value detail-value--grade" id="attempt-grade">A</span>
+                        <span class="detail-value detail-value--grade" id="attempt-grade">--</span> <!-- JS sẽ cập nhật -->
                     </div>
                      <div class="detail-item">
                         <span class="detail-label">Duration:</span>
-                        <!-- Updated by JS from localStorage -->
-                        <span class="detail-value" id="attempt-duration">--</span>
+                        <span class="detail-value" id="attempt-duration">--:--:--</span> <!-- JS sẽ cập nhật -->
                     </div>
                      <div class="detail-item">
                         <span class="detail-label">Raw Score:</span>
-                        <!-- Placeholder: e.g., 45 / 60 - Not updated by current JS -->
-                        <span class="detail-value" id="attempt-raw-score">45 / 60</span>
+                        <span class="detail-value" id="attempt-raw-score">-- / 60</span> <!-- JS sẽ cập nhật -->
                     </div>
                 </section>
 
@@ -124,11 +102,12 @@ Section C: Evaluation
                     Past paper
                  </a>
                  <a href="#view-feedback" class="button button--secondary attempt-action-button" id="view-feedback-btn" role="button">
-                    Previous attempt & feedback
+                    Feedback
                  </a>
                  <a href="#view-outline" class="button button--secondary attempt-action-button" id="view-outline-btn" role="button">
                     Outline
                  </a>
+                 <!-- TODO: Consider adding a "Generate New Outline" button if desired -->
 
                 <!-- Retake Button -->
                 <a href="test.html?paperId=unknown-paper" class="button button--primary retake-button" role="button">
@@ -156,6 +135,8 @@ Section C: Evaluation
     </div>
     <!-- ===== END RETAKE MODAL ===== -->
 
+    <!-- Element để hiển thị user messages -->
+    <div id="user-message-toast" class="toast" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 5px; color: white; z-index: 10000;"></div>
 
     <!-- ===== FOOTER ===== -->
      <footer class="footer section">
@@ -166,6 +147,11 @@ Section C: Evaluation
    </footer>
 
     <!-- ===== JAVASCRIPT ===== -->
+    <!-- Firebase App (Core) - LUÔN CẦN THIẾT -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <!-- Firebase Storage - Có thể không cần ở trang attempt, nhưng để nhất quán -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage-compat.js"></script>
+
     <script src="script.js" defer></script>
 </body>
 </html>

@@ -32,7 +32,7 @@
                 <!-- Logged Out State (Default) -->
                 <a href="#" class="nav__button-link" id="login-trigger-btn" data-open-modal="login-modal">Log in</a>
                 <a href="#" class="nav__button button button--primary" id="join-trigger-btn" data-open-modal="login-modal">Join now</a>
-            
+
                 <!-- Logged In State (Initially Hidden by JS/CSS potentially) -->
                 <div id="user-info" class="nav__user-info" style="display: none;"> <!-- Hide initially -->
                      <span class="nav__username" id="nav-username-display">User Name</span>
@@ -53,7 +53,6 @@
                     <p class="hero__description">
                         Practice A-level past papers, receive instant AI-powered essay scoring and feedback, and track your improvement.
                     </p>
-                    <!-- Search Bar MOVED FROM here -->
                 </div>
 
                 <!-- Hero Image -->
@@ -131,7 +130,15 @@
        </div>
    </footer>
 
+    <!-- Element để hiển thị user messages -->
+    <div id="user-message-toast" class="toast" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 5px; color: white; z-index: 10000;"></div>
+
     <!-- ===== JAVASCRIPT ===== -->
+    <!-- Firebase App (Core) - TÙY CHỌN ở đây, nhưng nên có nếu dùng các service khác như Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <!-- Firebase Storage - Có thể không cần ở trang index -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage-compat.js"></script> -->
+
     <script src="script.js" defer></script>
 </body>
 </html>
